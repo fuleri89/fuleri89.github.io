@@ -1,21 +1,22 @@
+<!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="google-adsense-account" content="ca-pub-3414602833442124">
     <title>iOS IPS Analyzer Pro</title>
     
-    <!-- Security: CSP (Erlaubt externe Skripte für Ads/Tailwind UND blob: für unseren Web Worker) -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; img-src 'self' data: https:;">
+    <!-- Security: CSP (Erlaubt worker-src blob: für die Analyse und https: für Google Ads) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:; img-src 'self' data: https:; worker-src 'self' blob:;">
     
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS & Fonts -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- JSZip for ZIP file parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
-    <!-- GOOGLE ADSENSE (Hier Ihre Publisher-ID eintragen) -->
+    <!-- GOOGLE ADSENSE -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3414602833442124" crossorigin="anonymous"></script>
-    
+
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; color: #111827; }
         pre::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -23,139 +24,228 @@
         pre::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
         .drag-active { border-color: #3b82f6 !important; background-color: #eff6ff !important; }
         .accordion-content { transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out; max-height: 0; opacity: 0; overflow: hidden; }
-        .accordion-content.expanded { max-height: 2500px; opacity: 1; overflow: visible; }
+        .accordion-content.expanded { max-height: 3000px; opacity: 1; overflow: visible; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col relative">
 
-    <!-- Cookie Consent / Privacy Notice (Wichtig für AdSense) -->
-    <div id="cookie-banner" class="fixed bottom-0 w-full bg-gray-900 text-white p-4 z-50 flex flex-col sm:flex-row justify-between items-center gap-4">
-        <p class="text-sm">Wir nutzen Cookies zur Personalisierung von Werbung (Google AdSense) und für den Betrieb der Seite. Ihre Log-Dateien werden zu 100% lokal verarbeitet und verlassen Ihr Gerät niemals.</p>
-        <button onclick="document.getElementById('cookie-banner').style.display='none'" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap">Verstanden</button>
+    <!-- Cookie Consent (Wichtig für AdSense) -->
+    <div id="cookie-banner" class="fixed bottom-0 w-full bg-gray-900 text-white p-4 z-[60] flex flex-col sm:flex-row justify-between items-center gap-4">
+        <p id="ui-cookie-text" class="text-sm">Wir nutzen Cookies zur Personalisierung von Werbung (Google AdSense) und für den Betrieb der Seite. Ihre Log-Dateien werden zu 100% lokal verarbeitet und verlassen Ihr Gerät niemals.</p>
+        <button onclick="document.getElementById('cookie-banner').style.display='none'" class="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-colors">OK</button>
     </div>
 
     <!-- Ad Slot: Top Banner -->
-    <div class="w-full max-w-5xl mx-auto mt-4 min-h-[90px] bg-gray-200 flex items-center justify-center rounded-xl overflow-hidden text-gray-400 text-sm">
-        <!-- Google AdSense Placeholder -->
-        <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" data-ad-slot="YYYYYYYYYY" data-ad-format="auto" data-full-width-responsive="true"></ins>
+    <div class="w-full max-w-5xl mx-auto mt-4 min-h-[90px] bg-gray-200 flex items-center justify-center rounded-xl overflow-hidden text-gray-400 text-sm relative">
+        <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-3414602833442124" data-ad-slot="1111111111" data-ad-format="auto" data-full-width-responsive="true"></ins>
         <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
-        <!-- Fallback Text falls Adblocker aktiv ist -->
-        <span class="absolute -z-10">Werbung unterstützt dieses kostenlose Projekt</span>
+        <span class="absolute -z-10" id="ui-ad-placeholder">Werbung / Advertisement</span>
     </div>
 
     <div class="max-w-5xl w-full mx-auto flex-1 flex flex-col p-4 sm:p-6">
         <!-- Header -->
-        <header class="mb-8 text-center sm:text-left flex flex-col sm:flex-row justify-between items-center gap-4">
+        <header class="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div>
-                <h1 class="text-3xl font-bold text-gray-900 tracking-tight flex items-center justify-center sm:justify-start gap-3">
+                <h1 class="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
+                        <path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414z" clip-rule="evenodd" />
                     </svg>
                     iOS IPS Analyzer <span class="text-blue-600 bg-blue-100 text-sm px-2 py-1 rounded-md ml-2 align-middle">Pro</span>
                 </h1>
-                <p class="text-gray-500 mt-2 text-sm sm:text-base">Batch-Analyse für iOS Diagnosedaten (.ips / .zip)</p>
+                <p id="ui-subtitle" class="text-gray-500 mt-2 text-sm sm:text-base">Batch-Analyse für iOS Diagnosedaten (.ips / .zip)</p>
             </div>
             
-            <div class="bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3 max-w-sm text-left">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-                <p class="text-xs text-gray-600 leading-tight">100% lokale Client-Verarbeitung.<br>Keine Daten verlassen Ihren Browser.</p>
+            <div class="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                <button id="lang-toggle" class="bg-white hover:bg-gray-50 text-gray-800 font-bold py-2.5 px-4 border border-gray-200 shadow-sm rounded-xl text-sm transition-colors flex items-center gap-2">
+                    <span class="text-lg">🌐</span> EN / DE
+                </button>
+                <div class="bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex items-center gap-3 text-left">
+                    <svg class="h-8 w-8 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                    <p id="ui-privacy" class="text-xs text-gray-600 leading-tight">100% lokale Verarbeitung.<br>Keine Daten verlassen das Gerät.</p>
+                </div>
             </div>
         </header>
 
         <main id="main-content" class="flex-1 flex flex-col">
             <!-- Upload View -->
-            <div id="upload-view" class="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-blue-300 rounded-3xl bg-white p-8 transition-all duration-200 ease-in-out cursor-pointer hover:bg-blue-50 hover:border-blue-500 min-h-[400px] shadow-sm">
+            <div id="upload-view" class="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-blue-300 rounded-3xl bg-white p-8 transition-all cursor-pointer hover:bg-blue-50 hover:border-blue-500 min-h-[400px] shadow-sm">
                 <input type="file" id="file-input" class="hidden" accept=".ips,.txt,.json,.zip" multiple>
-                
                 <div id="upload-initial-ui" class="flex flex-col items-center pointer-events-none">
                     <div class="bg-blue-100 p-4 rounded-full mb-4">
-                        <svg class="h-10 w-10 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                        <svg class="h-12 w-12 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
                     </div>
-                    <h3 class="text-xl font-bold text-gray-800">Dateien hier ablegen</h3>
-                    <p class="text-gray-500 mt-2 text-sm text-center max-w-md leading-relaxed">
-                        Ziehen Sie <strong>mehrere .ips Dateien</strong> oder ein <strong>.zip Archiv</strong> hierher.<br>Sie können auch klicken, um Dateien auszuwählen.
-                    </p>
+                    <h3 id="ui-upload-title" class="text-2xl font-bold text-gray-800">Dateien hier ablegen</h3>
+                    <p id="ui-upload-desc" class="text-gray-500 mt-2 text-base text-center leading-relaxed">Ziehen Sie mehrere .ips Dateien oder ein .zip Archiv hierher.</p>
                 </div>
-                
+                <!-- Loading Spinner (Hidden by default) -->
                 <div id="loading-spinner" class="hidden flex-col items-center">
-                    <div class="relative w-20 h-20 mb-4">
+                    <div class="relative w-24 h-24 mb-4">
                         <svg class="animate-spin w-full h-full text-gray-200" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="#2563eb" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <div class="absolute inset-0 flex items-center justify-center"><span id="progress-text" class="text-xs font-bold text-blue-600">0%</span></div>
+                        <div class="absolute inset-0 flex items-center justify-center"><span id="progress-text" class="text-sm font-bold text-blue-600">0%</span></div>
                     </div>
-                    <p id="loading-desc" class="text-sm text-gray-600 font-medium">Analysiere Dateien...</p>
+                    <p id="ui-loading-desc" class="text-base text-gray-600 font-medium">Analysiere Dateien...</p>
                 </div>
             </div>
 
             <!-- Dashboard View -->
             <div id="dashboard-view" class="hidden flex-col gap-4">
                 
-                <div class="flex justify-end mb-1">
-                    <button id="reset-btn" class="bg-white border-2 border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 px-5 py-2 rounded-xl font-semibold shadow-sm transition-all focus:outline-none flex items-center gap-2 text-sm">
+                <!-- Action Bar -->
+                <div class="flex justify-end mb-2">
+                    <button id="reset-btn" class="bg-white border-2 border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 px-5 py-2.5 rounded-xl font-semibold shadow-sm flex items-center gap-2 text-sm transition-all">
                         <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" /></svg>
-                        Neue Dateien analysieren
+                        <span id="ui-btn-new">Neue Dateien analysieren</span>
                     </button>
                 </div>
 
-                <!-- Toolbar -->
-                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4 sticky top-4 z-10">
-                    <div class="flex items-center gap-3">
-                        <span class="bg-blue-100 text-blue-800 text-sm font-bold px-3 py-1.5 rounded-lg" id="summary-badge">0 Dateien</span>
+                <!-- Toolbar (Filters & Sort) -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 sticky top-4 z-10">
+                    <div class="flex items-center gap-3 whitespace-nowrap">
+                        <span class="bg-blue-100 text-blue-800 text-sm font-bold px-3 py-1.5 rounded-lg border border-blue-200" id="summary-badge">0 Dateien</span>
                     </div>
                     
-                    <div class="flex flex-col lg:flex-row gap-3 w-full lg:w-auto flex-wrap items-center">
-                        <div class="flex items-center border-b lg:border-b-0 lg:border-r border-gray-200 pb-3 lg:pb-0 lg:pr-3 w-full lg:w-auto justify-between">
+                    <div class="flex flex-col md:flex-row gap-3 w-full xl:w-auto flex-wrap items-center">
+                        
+                        <!-- Toggle System Processes -->
+                        <div class="flex items-center border-b md:border-b-0 md:border-r border-gray-200 pb-3 md:pb-0 md:pr-3 w-full md:w-auto justify-between md:justify-start">
+                            <span id="ui-filter-sys" class="mr-3 text-sm font-medium text-gray-700">Systemprozesse</span>
                             <label class="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" id="toggle-system-procs" checked class="sr-only peer">
-                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                                <span class="ml-2 text-sm font-medium text-gray-700">Systemprozesse</span>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                             </label>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <select id="time-filter" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-xl focus:ring-blue-500 block p-2.5 outline-none">
-                                <option value="all">Alle Zeiten</option><option value="24h">Letzte 24h</option><option value="7d">Letzte 7 Tage</option><option value="30d">Letzte 30 Tage</option>
+
+                        <!-- Time Filter -->
+                        <select id="time-filter" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-xl block p-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-full md:w-auto cursor-pointer">
+                            <option value="all" id="ui-time-all">Alle Zeiten</option>
+                            <option value="24h" id="ui-time-24">Letzte 24h</option>
+                            <option value="7d" id="ui-time-7">Letzte 7 Tage</option>
+                            <option value="30d" id="ui-time-30">Letzte 30 Tage</option>
+                        </select>
+                        
+                        <!-- Category Filter -->
+                        <select id="filter-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-xl block p-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-full md:w-auto cursor-pointer">
+                            <option value="all" id="ui-type-all">Alle Arten anzeigen</option>
+                            <option value="critical" id="ui-type-crit">🔴 Nur Abstürze</option>
+                            <option value="info" id="ui-type-info">🔵 Nur System-Infos</option>
+                            <option value="sec-risk" id="ui-type-secrisk">🛡️ Nur Sicherheitsrisiken</option>
+                            <option value="sec-safe" id="ui-type-secsafe">✅ Keine Sicherheitsrisiken</option>
+                        </select>
+
+                        <!-- Sorting -->
+                        <div class="flex items-center shadow-sm rounded-xl w-full md:w-auto">
+                            <select id="sort-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-l-xl block p-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-full cursor-pointer">
+                                <option value="severity" id="ui-sort-sev">Kritikalität</option>
+                                <option value="security" id="ui-sort-sec">Sicherheitsrisiko</option>
+                                <option value="date" id="ui-sort-date">Datum</option>
+                                <option value="app" id="ui-sort-app">App-Name</option>
                             </select>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <select id="filter-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-xl focus:ring-blue-500 block p-2.5 outline-none">
-                                <option value="all">Alle Arten anzeigen</option><option value="critical">🔴 Nur Abstürze</option><option value="info">🔵 Nur System-Infos</option><option value="sec-risk">🛡️ Nur Sicherheitsrisiken</option><option value="sec-safe">✅ Keine Sicherheitsrisiken</option>
-                            </select>
-                        </div>
-                        <div class="flex items-center gap-2 shadow-sm rounded-xl">
-                            <select id="sort-select" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-l-xl focus:ring-blue-500 block p-2.5 outline-none border-r-0">
-                                <option value="severity">Kritikalität</option><option value="security">Sicherheitsrisiko</option><option value="date">Datum</option><option value="app">App-Name</option>
-                            </select>
-                            <button id="sort-dir-btn" data-dir="desc" class="bg-gray-100 border border-gray-300 text-gray-700 hover:bg-gray-200 px-3 py-2.5 rounded-r-xl transition-colors focus:outline-none">
-                                <svg id="sort-dir-icon" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            <button id="sort-dir-btn" data-dir="desc" class="bg-gray-100 border border-gray-300 border-l-0 text-gray-700 hover:bg-gray-200 px-4 py-3 rounded-r-xl transition-colors outline-none focus:border-blue-500 flex items-center justify-center">
+                                <svg id="sort-dir-icon" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <div id="results-list" class="flex flex-col gap-4 mb-12"></div>
+                <!-- Analysis Results -->
+                <div id="results-list" class="flex flex-col gap-4 mb-8"></div>
                 
                 <!-- Ad Slot: Bottom Inline -->
-                <div class="w-full bg-white p-4 rounded-xl border border-gray-200 text-center text-xs text-gray-400 mb-12">
-                    <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" data-ad-slot="ZZZZZZZZZZ" data-ad-format="horizontal" data-full-width-responsive="true"></ins>
+                <div class="w-full bg-white p-4 rounded-xl border border-gray-200 text-center text-xs text-gray-400 mb-12 flex justify-center items-center min-h-[90px]">
+                    <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-3414602833442124" data-ad-slot="2222222222" data-ad-format="horizontal" data-full-width-responsive="true"></ins>
                     <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
                 </div>
             </div>
         </main>
     </div>
 
-    <button id="go-top-btn" class="fixed bottom-6 right-6 bg-blue-600 text-white p-3.5 rounded-full shadow-lg opacity-0 pointer-events-none translate-y-4 transition-all duration-300 hover:bg-blue-700 hover:-translate-y-1 z-50">
+    <!-- Go to Top Button -->
+    <button id="go-top-btn" class="fixed bottom-20 sm:bottom-6 right-6 bg-blue-600 text-white p-3.5 rounded-full shadow-lg opacity-0 pointer-events-none translate-y-4 transition-all duration-300 hover:bg-blue-700 hover:-translate-y-1 z-50">
         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
     </button>
 
     <script>
+        // State
+        let currentLang = 'de';
         let allResults = [];
         let expectedFileCount = 0;
         let processedFileCount = 0;
+        let originalFiles = []; 
+        let isProcessing = false; 
 
+        // Localization Dictionaries
+        const texts = {
+            de: {
+                cookie: "Wir nutzen Cookies zur Personalisierung von Werbung (Google AdSense) und für den Betrieb der Seite. Ihre Log-Dateien werden zu 100% lokal verarbeitet und verlassen Ihr Gerät niemals.",
+                sub: "Batch-Analyse für iOS Diagnosedaten (.ips / .zip)",
+                priv: "100% lokale Verarbeitung.<br>Keine Daten verlassen das Gerät.",
+                upTitle: "Dateien hier ablegen",
+                upDesc: "Ziehen Sie mehrere .ips Dateien oder ein .zip Archiv hierher.",
+                load: "Analysiere Dateien...",
+                newBtn: "Neue Dateien analysieren",
+                fSys: "Systemprozesse",
+                tAll: "Alle Zeiten", t24: "Letzte 24h", t7: "Letzte 7 Tage", t30: "Letzte 30 Tage",
+                tyAll: "Alle Arten", tyCrit: "🔴 Nur Abstürze", tyInfo: "🔵 Nur System-Infos", tySecRisk: "🛡️ Nur Sicherheitsrisiken", tySecSafe: "✅ Keine Sicherheitsrisiken",
+                sSev: "Kritikalität", sSec: "Sicherheitsrisiko", sDate: "Datum", sApp: "App-Name",
+                fileCount: "Dateien", noRes: "Keine Ergebnisse entsprechen den aktuellen Filtern.", 
+                secH: "Sicherheitsbewertung", recH: "Empfehlungen", rawH: "Rohdaten einblenden / Technical Details"
+            },
+            en: {
+                cookie: "We use cookies to personalize ads (Google AdSense) and for essential operations. Your logs are processed 100% locally and never leave your device.",
+                sub: "Batch analysis for iOS diagnostic data (.ips / .zip)",
+                priv: "100% local processing.<br>No data leaves your device.",
+                upTitle: "Drop files here",
+                upDesc: "Drag multiple .ips files or a .zip archive here.",
+                load: "Analyzing files...",
+                newBtn: "Analyze new files",
+                fSys: "System processes",
+                tAll: "All Time", t24: "Last 24h", t7: "Last 7 Days", t30: "Last 30 Days",
+                tyAll: "All Types", tyCrit: "🔴 Crashes only", tyInfo: "🔵 System Info only", tySecRisk: "🛡️ Security Risks only", tySecSafe: "✅ No Security Risks",
+                sSev: "Severity", sSec: "Security Risk", sDate: "Date", sApp: "App Name",
+                fileCount: "Files", noRes: "No results match the current filters.", 
+                secH: "Security Assessment", recH: "Recommendations", rawH: "Show raw data / Technical Details"
+            }
+        };
+
+        // UI Updater
+        const updateUILang = () => {
+            const t = texts[currentLang];
+            document.getElementById('ui-cookie-text').textContent = t.cookie;
+            document.getElementById('ui-subtitle').textContent = t.sub;
+            document.getElementById('ui-privacy').innerHTML = t.priv;
+            document.getElementById('ui-upload-title').textContent = t.upTitle;
+            document.getElementById('ui-upload-desc').textContent = t.upDesc;
+            document.getElementById('ui-loading-desc').textContent = t.load;
+            document.getElementById('ui-btn-new').textContent = t.newBtn;
+            document.getElementById('ui-filter-sys').textContent = t.fSys;
+            
+            document.getElementById('ui-time-all').textContent = t.tAll; document.getElementById('ui-time-24').textContent = t.t24;
+            document.getElementById('ui-time-7').textContent = t.t7; document.getElementById('ui-time-30').textContent = t.t30;
+            
+            document.getElementById('ui-type-all').textContent = t.tyAll; document.getElementById('ui-type-crit').textContent = t.tyCrit;
+            document.getElementById('ui-type-info').textContent = t.tyInfo; document.getElementById('ui-type-secrisk').textContent = t.tySecRisk;
+            document.getElementById('ui-type-secsafe').textContent = t.tySecSafe;
+            
+            document.getElementById('ui-sort-sev').textContent = t.sSev; document.getElementById('ui-sort-sec').textContent = t.sSec;
+            document.getElementById('ui-sort-date').textContent = t.sDate; document.getElementById('ui-sort-app').textContent = t.sApp;
+            
+            renderResults(); 
+        };
+
+        // Toggle Language
+        document.getElementById('lang-toggle').addEventListener('click', () => {
+            currentLang = currentLang === 'de' ? 'en' : 'de';
+            if(originalFiles.length > 0) { 
+                runWorkerBatch(originalFiles); 
+            } else { 
+                updateUILang(); 
+            }
+        });
+
+        // Worker Code mapped to the "ips analyzer" spec
         const workerCode = `
             self.onmessage = function(e) {
-                const { text, fileName, fileId } = e.data;
+                const { text, fileName, fileId, lang } = e.data;
                 let header = {}, payload = {};
                 try {
                     const firstNewline = text.indexOf('\\n');
@@ -167,128 +257,153 @@
                         try { payload = JSON.parse(text); } catch(err) {}
                     }
                     
-                    const appName = header.app_name || payload.procName || "Unbekannt";
+                    const appName = header.app_name || payload.procName || "Unbekannt/Unknown";
                     let bundleId = payload.bundleInfo?.CFBundleIdentifier || header.bundleID || "N/A";
                     const isFirstParty = header.is_first_party === 1 || bundleId.startsWith("com.apple.");
                     const appStoreId = header.adam_id || payload.storeInfo?.itemID || null;
-                    const actor = isFirstParty ? "Der Systemprozess" : "Die App";
-                    const osVersion = header.os_version || (payload.osVersion ? payload.osVersion.train + " (" + payload.osVersion.build + ")" : "Unbekannt");
-                    const bugType = header.bug_type || "N/A";
+                    const actor = isFirstParty ? (lang === 'de' ? "Der Systemprozess" : "System process") : (lang === 'de' ? "Die App" : "The App");
                     
                     const tsStr = header.timestamp || payload.captureTime || "1970-01-01 00:00:00";
                     const timestamp = new Date(tsStr.replace(/ \\+\\d{4}$/, '')).getTime() || 0;
                     
                     const excType = payload.exception?.type || "";
                     const excSignal = payload.exception?.signal || "";
-                    const exceptionStr = excType ? (excType + (excSignal ? " (" + excSignal + ")" : "")) : "Keine Exception";
-                    
-                    const termNamespace = payload.termination?.namespace || "";
+                    const bugType = header.bug_type || "N/A";
                     const termCode = payload.termination?.code ?? null;
-                    let termStr = "N/A", termCodeHex = "";
-                    if (termCode !== null) {
-                        termCodeHex = "0x" + Number(termCode).toString(16).toUpperCase();
-                        termStr = (termNamespace ? termNamespace + " " : "") + termCode + " (" + termCodeHex + ")";
-                    }
+                    const termNamespace = payload.termination?.namespace || "";
+                    let termCodeHex = termCode !== null ? "0x" + Number(termCode).toString(16).toUpperCase() : "";
 
-                    // --- Crash Mapping Logic ---
-                    let nTitle = "Unerwarteter Absturz";
-                    let nDesc = actor + " '" + appName + "' ist aufgrund eines unerkannten Fehlers abgestürzt.";
-                    let nDetailed = "Das System konnte die genaue Ursache nicht eindeutig kategorisieren. Oftmals handelt es sich um eine temporäre Überlastung oder einen seltenen Programmfehler.";
-                    let sColor = "gray", sScore = 1; 
-                    let secRisk = { level: "Unbekannt", color: "gray", desc: "Das Risiko kann aufgrund fehlender Fehlerklassifizierung nicht bewertet werden. Solche Berichte sind bei iOS jedoch nahezu immer gewöhnliche Softwarefehler und keine Viren." };
-                    let recs = ["Halten Sie Ihr iOS stets aktuell.", "Prüfen Sie im App Store auf Updates.", "Starten Sie das Gerät neu."];
-
+                    // Crash Mapping based on "ips analyzer" logic
+                    let nTitle, nDesc, nDetailed, sColor, sScore, secLevel, secDesc, secColor, recs;
+                    
                     if (bugType === "308" || bugType === "298" || termNamespace === "JETSAM") {
-                        nTitle = "Speicherbereinigung (Jetsam)";
-                        nDesc = "Dies ist kein Absturz durch einen Fehler, sondern ein reguläres Systemereignis zur RAM-Bereinigung.";
-                        nDetailed = "Achtung: Dies ist definitiv kein Anzeichen für einen Hackerangriff, Spyware oder Malware. Der Bericht ('Jetsam Event') ist ein völlig normales Protokoll des iOS-Betriebssystems. Wenn Sie viele Apps nutzen, räumt das System proaktiv den Arbeitsspeicher auf.";
-                        sColor = "blue"; sScore = 2;
-                        secRisk = { level: "Kein Risiko", color: "green", desc: "Es handelt sich um eine gewollte Speicherverwaltung des Systems. Es gibt absolut keinerlei Hinweise auf einen unbefugten Zugriff." };
-                        recs = ["Sie müssen nichts unternehmen.", "Wenn Ihr Gerät generell langsam ist, schließen Sie nicht benötigte Apps."];
+                        nTitle = lang==='de' ? "Speicherbereinigung (Jetsam)" : "Memory Cleanup (Jetsam)";
+                        nDesc = lang==='de' ? "Dies ist kein Absturz durch einen Fehler, sondern ein reguläres Systemereignis zur RAM-Bereinigung." : "Not a crash, but a normal system event to clear RAM.";
+                        nDetailed = lang==='de' ? "Achtung: Dies ist definitiv kein Anzeichen für einen Hackerangriff, Spyware oder Malware. Der Bericht ('Jetsam Event') ist ein völlig normales Protokoll des iOS-Betriebssystems. Wenn Sie viele Apps gleichzeitig nutzen, räumt das System proaktiv den Arbeitsspeicher auf." : "Warning: This is not an indication of hacking or malware. It's a standard iOS protocol to free up memory when multitasking.";
+                        sColor = "blue"; sScore = 2; secColor = "green";
+                        secLevel = lang==='de' ? "Kein Risiko" : "No Risk";
+                        secDesc = lang==='de' ? "Gewollte Speicherverwaltung des Systems." : "Intended system memory management.";
+                        recs = lang==='de' ? ["Sie müssen nichts unternehmen.", "Schließen Sie nicht benötigte Apps."] : ["No action required.", "Close unused apps if device is slow."];
                     }
                     else if (excType === "EXC_BAD_ACCESS" || excSignal === "SIGSEGV") {
-                        nTitle = "Speicherzugriffsfehler (EXC_BAD_ACCESS)";
-                        nDesc = actor + " '" + appName + "' hat versucht, auf einen geschützten oder ungültigen Arbeitsspeicherbereich zuzugreifen.";
-                        nDetailed = "Dies ist ein klassischer Programmierfehler (wie z.B. das Dereferenzieren eines Null-Zeigers). Das Apple-Betriebssystem hat den Fehler sofort erkannt und den Prozess als strenge Vorsichtsmaßnahme beendet.";
-                        sColor = "red"; sScore = 4;
-                        secRisk = { level: "Gering", color: "green", desc: "Obwohl es bedrohlich klingt, ist es durch das iOS-Sandboxing nahezu unmöglich, dass dies durch Malware verursacht wird. Es ist ein reiner Stabilitätsfehler." };
-                        recs = ["Installieren Sie das neueste Update für diese App.", "Falls es sich um eine Drittanbieter-App handelt, löschen Sie sie und installieren Sie sie neu."];
+                        nTitle = lang==='de' ? "Speicherzugriffsfehler (EXC_BAD_ACCESS)" : "Memory Access Error (EXC_BAD_ACCESS)";
+                        nDesc = actor + " '" + appName + "' " + (lang==='de' ? "hat versucht, auf einen geschützten oder ungültigen Arbeitsspeicherbereich zuzugreifen." : "attempted to access a protected or invalid memory region.");
+                        nDetailed = lang==='de' ? "Dies ist ein klassischer Programmierfehler (wie z.B. das Dereferenzieren eines Null-Zeigers oder der Zugriff auf bereits freigegebenen Speicher). Das Apple-Betriebssystem hat den Fehler sofort erkannt und den Prozess beendet." : "A classic programming error (e.g. null-pointer). The OS detected it and terminated the process to protect system stability.";
+                        sColor = "red"; sScore = 4; secColor = "green";
+                        secLevel = lang==='de' ? "Gering" : "Low";
+                        secDesc = lang==='de' ? "Durch iOS-Sandboxing ist es extrem unwahrscheinlich, dass dies Malware ist." : "Due to iOS sandboxing, it is extremely unlikely to be malware.";
+                        recs = lang==='de' ? ["App im App Store updaten.", "App ggf. neu installieren."] : ["Update the app in App Store.", "Reinstall the app if it persists."];
                     }
                     else if (excType === "EXC_GUARD") {
-                        nTitle = "Ressourcenschutz (EXC_GUARD)";
-                        nDesc = actor + " '" + appName + "' hat eine interne Sicherheitsmaßnahme des Betriebssystems ausgelöst.";
-                        nDetailed = "Der Prozess hat versehentlich versucht, eine Datei oder Netzwerkverbindung zu schließen, die vom System noch zwingend benötigt und daher gesperrt ('guarded') wurde.";
-                        sColor = "yellow"; sScore = 3;
-                        secRisk = { level: "Gering", color: "green", desc: "Das Betriebssystem hat sich selbst erfolgreich geschützt. Es fand kein unzulässiger Zugriff auf systemkritische Daten statt." };
-                        recs = ["Es sind keine direkten Gegenmaßnahmen erforderlich.", "Halten Sie Gerät und Apps aktuell."];
+                        nTitle = lang==='de' ? "Ressourcenschutz (EXC_GUARD)" : "Resource Guard (EXC_GUARD)";
+                        nDesc = actor + " '" + appName + "' " + (lang==='de' ? "hat eine interne Sicherheitsmaßnahme des Betriebssystems ausgelöst." : "triggered an internal OS safeguard.");
+                        nDetailed = lang==='de' ? "Die App hat versehentlich versucht, eine Datei oder Netzwerkverbindung zu schließen, die vom System noch benötigt und daher gesperrt ('guarded') wurde. Das Apple-Betriebssystem hat die App als reine Vorsichtsmaßnahme beendet." : "The process tried to manipulate a locked resource (like a file descriptor). The system protected itself by terminating the app.";
+                        sColor = "yellow"; sScore = 3; secColor = "green";
+                        secLevel = lang==='de' ? "Gering" : "Low";
+                        secDesc = lang==='de' ? "Das System hat sich erfolgreich geschützt." : "The system successfully protected itself.";
+                        recs = lang==='de' ? ["Keine Maßnahmen erforderlich."] : ["No action required."];
                     }
                     else if (termCodeHex === "0x8BADF00D") {
-                        nTitle = "Watchdog Timeout (0x8BADF00D)";
-                        nDesc = actor + " '" + appName + "' wurde zwangsweise beendet, weil keine Reaktion mehr erfolgte.";
-                        nDetailed = "Das System beendet Prozesse automatisch, die zu lange (oft >10s) nicht mehr auf Eingaben reagieren, z.B. bei endlosen Ladevorgängen im Hintergrund.";
-                        sColor = "yellow"; sScore = 3;
-                        secRisk = { level: "Kein Risiko", color: "green", desc: "Dies ist ein reines Performance-Problem ohne sicherheitsrelevante Auswirkungen." };
-                        recs = ["Starten Sie die App einfach neu.", "Prüfen Sie Ihre Internetverbindung."];
+                        nTitle = lang==='de' ? "Watchdog Timeout (0x8BADF00D)" : "Watchdog Timeout (0x8BADF00D)";
+                        nDesc = actor + " '" + appName + "' " + (lang==='de' ? "wurde vom Systemwächter beendet, weil keine Reaktion mehr erfolgte." : "was terminated due to unresponsiveness.");
+                        nDetailed = lang==='de' ? "Das System beendet Prozesse automatisch, die zu lange nicht reagieren (z.B. endlose Ladevorgänge ohne die Benutzeroberfläche flüssig zu halten)." : "The OS terminates processes that block the main thread for too long (e.g. heavy networking on the UI thread).";
+                        sColor = "yellow"; sScore = 3; secColor = "green";
+                        secLevel = lang==='de' ? "Kein Risiko" : "No Risk";
+                        secDesc = lang==='de' ? "Reines Performance-Problem." : "Purely a performance issue.";
+                        recs = lang==='de' ? ["App neu starten.", "Internetverbindung prüfen."] : ["Restart app.", "Check connection."];
                     }
                     else if (termCodeHex === "0xDEAD10CC") {
-                        nTitle = "Hintergrund-Ressourcensperre (0xDEAD10CC)";
-                        nDesc = actor + " '" + appName + "' wurde beim Wechseln in den Hintergrund beendet (Blockade).";
-                        nDetailed = "Ein Prozess hat während des Wechsels in den Hintergrund eine Ressource blockiert (Deadlock). Das System hat den Prozess sofort zwangsbeendet, um Akku zu schonen.";
-                        sColor = "yellow"; sScore = 3;
-                        secRisk = { level: "Kein Risiko", color: "green", desc: "Ein Koordinationsfehler, der vom System sicher gehandhabt wurde." };
-                        recs = ["Erzwingen Sie das Schließen der App und öffnen Sie sie neu."];
+                        nTitle = lang==='de' ? "Hintergrund-Ressourcensperre (0xDEAD10CC)" : "Deadlock (0xDEAD10CC)";
+                        nDesc = actor + " '" + appName + "' " + (lang==='de' ? "wurde im Hintergrund beendet (Blockade)." : "was terminated in background (deadlock).");
+                        nDetailed = lang==='de' ? "Ein Prozess hat während des Wechsels in den Hintergrundstatus eine Systemressource blockiert (Deadlock)." : "A process locked a resource without releasing it during background transition.";
+                        sColor = "yellow"; sScore = 3; secColor = "green";
+                        secLevel = lang==='de' ? "Kein Risiko" : "No Risk";
+                        secDesc = lang==='de' ? "Koordinationsfehler, vom System gehandhabt." : "Coordination error, handled by system.";
+                        recs = lang==='de' ? ["App schließen und neu öffnen."] : ["Force close and reopen."];
                     }
-                    else if (excType === "EXC_CRASH" && excSignal === "SIGABRT") {
-                        nTitle = "Erzwungener Abbruch (SIGABRT)";
-                        nDesc = actor + " '" + appName + "' hat einen internen Fehler festgestellt und sich aus Sicherheitsgründen selbst beendet.";
-                        nDetailed = "Der Prozess hat während der Laufzeit einen Zustand erreicht, den die Entwickler als fehlerhaft definiert haben. Um Datenkorruption zu verhindern, hat die App den Abbruch-Befehl aufgerufen.";
-                        sColor = "red"; sScore = 4;
-                        secRisk = { level: "Gering", color: "green", desc: "Der Selbstabbruch ist eine eingebaute Schutzmaßnahme. Es greifen interne Fehlerprüfungen." };
-                        recs = ["Suchen Sie nach Updates.", "Starten Sie die App komplett neu."];
-                    }
-                    else if (excType === "EXC_USER_FAULT" || text.toLowerCase().includes("excuserfault")) {
-                        nTitle = "Nicht-fataler Diagnosebericht";
-                        nDesc = "Dieser Bericht zu '" + appName + "' ist kein echter Absturz, sondern ein reines Informations-Protokoll.";
-                        nDetailed = "Es handelt sich um ein Diagnose-Ereignis, das vom iOS-System absichtlich angefordert wurde.";
-                        sColor = "blue"; sScore = 2;
-                        secRisk = { level: "Kein Risiko", color: "green", desc: "Dies ist eine reine Diagnose-Datei für Entwickler." };
-                        recs = ["Dieser Bericht kann sicher ignoriert werden."];
+                    else {
+                        nTitle = lang==='de' ? "Unerwarteter Absturz" : "Unexpected Crash";
+                        nDesc = actor + " '" + appName + "' " + (lang==='de' ? "ist aufgrund eines unklassifizierten Fehlers abgestürzt." : "has crashed due to an unclassified error.");
+                        nDetailed = lang==='de' ? "Oftmals eine temporäre Überlastung oder ein Softwarefehler innerhalb der App." : "Often a temporary overload or software bug.";
+                        sColor = "gray"; sScore = 1; secColor = "gray";
+                        secLevel = lang==='de' ? "Unbekannt" : "Unknown";
+                        secDesc = lang==='de' ? "Fehler nicht spezifisch klassifiziert, aber in iOS fast immer harmlose Bugs." : "Not specifically classified, but almost always a harmless bug on iOS.";
+                        recs = lang==='de' ? ["iOS aktuell halten.", "App updaten."] : ["Keep iOS updated.", "Update App."];
                     }
 
                     self.postMessage({
                         fileId, fileName, timestamp, timestampStr: tsStr, severityScore: sScore,
                         appInfo: { isFirstParty, appStoreId },
-                        metrics: { app: appName, bundle: bundleId, os: osVersion, bugType, exception: exceptionStr, term: termStr },
+                        metrics: { app: appName },
                         narrative: { title: nTitle, desc: nDesc, detailed: nDetailed, color: sColor },
-                        security: secRisk, recommendations: recs, rawPayload: { header, payload }
+                        security: { level: secLevel, color: secColor, desc: secDesc },
+                        recommendations: recs, rawPayload: { header, payload }
                     });
                 } catch (error) {
-                    self.postMessage({ error: "Fehler", fileName, fileId, isError: true });
+                    self.postMessage({ error: "Parse Error", fileName, fileId, isError: true });
                 }
             };
         `;
 
-        const worker = new Worker(URL.createObjectURL(new Blob([workerCode], { type: 'application/javascript' })));
+        const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+        const workerURL = URL.createObjectURL(workerBlob);
         
-        // DOM Elements
+        // Setup DOM Elements
         const dropZone = document.getElementById('upload-view');
         const fileInput = document.getElementById('file-input');
-        const uploadInitialUi = document.getElementById('upload-initial-ui');
-        const loadingSpinner = document.getElementById('loading-spinner');
-        const resultsList = document.getElementById('results-list');
         const dashboardView = document.getElementById('dashboard-view');
         const goTopBtn = document.getElementById('go-top-btn');
 
-        // Event Listeners (Drag & Drop, Clicks)
-        dropZone.addEventListener('click', () => fileInput.click());
+        // Soft Reset Function (Fix for the broken "Neue Dateien analysieren" Button)
+        function resetApp() {
+            allResults = [];
+            originalFiles = [];
+            expectedFileCount = 0;
+            processedFileCount = 0;
+            isProcessing = false;
+            
+            document.getElementById('results-list').innerHTML = '';
+            document.getElementById('file-input').value = ''; 
+            
+            // Toggle Views
+            dashboardView.classList.add('hidden');
+            dashboardView.classList.remove('flex');
+            
+            dropZone.classList.remove('hidden');
+            dropZone.classList.add('flex');
+            dropZone.classList.remove('pointer-events-none');
+            dropZone.classList.add('cursor-pointer', 'hover:bg-blue-50');
+            
+            document.getElementById('upload-initial-ui').classList.remove('hidden');
+            document.getElementById('loading-spinner').classList.add('hidden');
+            document.getElementById('loading-spinner').classList.remove('flex');
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Drag & Drop Listeners
+        dropZone.addEventListener('click', () => {
+            if(!isProcessing) fileInput.click();
+        });
+        
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
-        ['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.add('drag-active')));
-        ['dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.remove('drag-active')));
+        ['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, () => {
+            if(!isProcessing) dropZone.classList.add('drag-active');
+        }));
+        ['dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, () => {
+            if(!isProcessing) dropZone.classList.remove('drag-active');
+        }));
         
-        dropZone.addEventListener('drop', e => { if(e.dataTransfer.files.length) processFiles(e.dataTransfer.files); });
-        fileInput.addEventListener('change', function() { if(this.files.length) processFiles(this.files); });
+        dropZone.addEventListener('drop', e => { 
+            if(e.dataTransfer.files.length && !isProcessing) processFiles(e.dataTransfer.files); 
+        });
         
-        document.getElementById('reset-btn').addEventListener('click', () => location.reload()); // Simple reset
+        fileInput.addEventListener('change', function() { 
+            if(this.files.length && !isProcessing) processFiles(this.files); 
+        });
+        
+        // Bind Filters, Soft Reset & Sorting
+        document.getElementById('reset-btn').addEventListener('click', resetApp);
         document.querySelectorAll('select, input[type="checkbox"]').forEach(el => el.addEventListener('change', renderResults));
         
         const sortDirBtn = document.getElementById('sort-dir-btn');
@@ -299,6 +414,7 @@
             renderResults();
         });
 
+        // Go to top listener
         window.addEventListener('scroll', () => {
             goTopBtn.classList.toggle('opacity-0', window.scrollY < 400);
             goTopBtn.classList.toggle('pointer-events-none', window.scrollY < 400);
@@ -306,45 +422,78 @@
         });
         goTopBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 
+        // Read files (ZIP or raw)
         async function processFiles(fileList) {
-            uploadInitialUi.classList.add('hidden');
-            loadingSpinner.classList.remove('hidden'); loadingSpinner.classList.add('flex');
+            isProcessing = true;
+            document.getElementById('upload-initial-ui').classList.add('hidden');
+            document.getElementById('loading-spinner').classList.remove('hidden'); 
+            document.getElementById('loading-spinner').classList.add('flex');
             dropZone.classList.remove('cursor-pointer', 'hover:bg-blue-50');
             
-            allResults = [];
-            let filesToProcess = [];
-            
+            originalFiles = [];
             for (let file of fileList) {
                 if (file.name.toLowerCase().endsWith('.zip')) {
-                    const zip = await JSZip.loadAsync(file);
-                    for (let [filename, zipEntry] of Object.entries(zip.files)) {
-                        if (!zipEntry.dir && filename.match(/\.(ips|json|txt)$/i)) {
-                            filesToProcess.push({ name: filename, text: await zipEntry.async("text") });
+                    try {
+                        const zip = await JSZip.loadAsync(file);
+                        for (let [filename, zipEntry] of Object.entries(zip.files)) {
+                            if (!zipEntry.dir && filename.match(/\.(ips|json|txt)$/i)) {
+                                originalFiles.push({ name: filename, text: await zipEntry.async("text") });
+                            }
                         }
+                    } catch (e) {
+                        console.error("ZIP extract error:", e);
                     }
                 } else {
-                    filesToProcess.push({ name: file.name, text: await new Promise(r => { const reader = new FileReader(); reader.onload = e => r(e.target.result); reader.readAsText(file); }) });
+                    const text = await new Promise(r => { 
+                        const reader = new FileReader(); 
+                        reader.onload = e => r(e.target.result); 
+                        reader.readAsText(file); 
+                    });
+                    originalFiles.push({ name: file.name, text });
                 }
             }
-
-            expectedFileCount = filesToProcess.length;
-            processedFileCount = 0;
-            if (expectedFileCount === 0) return location.reload();
-            
-            filesToProcess.forEach((f, i) => worker.postMessage({ text: f.text, fileName: f.name, fileId: i }));
+            runWorkerBatch(originalFiles);
         }
 
-        worker.onmessage = function(e) {
-            processedFileCount++;
-            document.getElementById('progress-text').textContent = Math.round((processedFileCount / expectedFileCount) * 100) + '%';
-            if (!e.data.isError) allResults.push(e.data);
+        function runWorkerBatch(filesToProcess) {
+            allResults = [];
+            expectedFileCount = filesToProcess.length;
+            processedFileCount = 0;
             
-            if (processedFileCount === expectedFileCount) {
-                dropZone.classList.add('hidden');
-                dashboardView.classList.remove('hidden'); dashboardView.classList.add('flex');
-                renderResults();
+            if (expectedFileCount === 0) {
+                resetApp();
+                alert(texts[currentLang].noRes);
+                return;
             }
-        };
+            
+            document.getElementById('progress-text').textContent = '0%';
+            
+            const worker = new Worker(workerURL);
+            worker.onmessage = function(e) {
+                processedFileCount++;
+                
+                const perc = Math.round((processedFileCount / expectedFileCount) * 100) + '%';
+                const pText = document.getElementById('progress-text');
+                if (pText) pText.textContent = perc;
+                
+                if (!e.data.isError) allResults.push(e.data);
+                
+                if (processedFileCount === expectedFileCount) {
+                    worker.terminate();
+                    
+                    dropZone.classList.add('hidden');
+                    dropZone.classList.remove('flex');
+                    
+                    dashboardView.classList.remove('hidden'); 
+                    dashboardView.classList.add('flex');
+                    
+                    updateUILang(); 
+                    isProcessing = false;
+                }
+            };
+            
+            filesToProcess.forEach((f, i) => worker.postMessage({ text: f.text, fileName: f.name, fileId: i, lang: currentLang }));
+        }
 
         const getSecScore = c => c === 'red' ? 3 : c === 'yellow' ? 2 : c === 'green' ? 1 : 0;
 
@@ -355,65 +504,113 @@
             const showSystem = document.getElementById('toggle-system-procs').checked;
             const now = Date.now();
             const sortDir = sortDirBtn.getAttribute('data-dir') === 'desc' ? -1 : 1;
+            const t = texts[currentLang];
 
+            // Filter
             let filtered = allResults.filter(r => {
                 if (!showSystem && r.appInfo.isFirstParty) return false;
+                
                 if (timeVal !== 'all') {
                     const diff = Math.abs(now - r.timestamp);
                     if (timeVal === '24h' && diff > 86400000) return false;
                     if (timeVal === '7d' && diff > 604800000) return false;
                     if (timeVal === '30d' && diff > 2592000000) return false;
                 }
+                
                 if (filterVal === 'critical' && r.severityScore < 3) return false;
                 if (filterVal === 'info' && r.severityScore > 2) return false;
                 if (filterVal === 'sec-risk' && getSecScore(r.security.color) < 2) return false;
                 if (filterVal === 'sec-safe' && getSecScore(r.security.color) > 1) return false;
+                
                 return true;
-            }).sort((a, b) => {
+            });
+
+            // Sort
+            filtered = filtered.sort((a, b) => {
                 let cmp = 0;
                 if (sortVal === 'severity') cmp = a.severityScore - b.severityScore || a.timestamp - b.timestamp;
                 else if (sortVal === 'security') cmp = getSecScore(a.security.color) - getSecScore(b.security.color) || a.timestamp - b.timestamp;
                 else if (sortVal === 'date') cmp = a.timestamp - b.timestamp;
                 else if (sortVal === 'app') cmp = a.metrics.app.localeCompare(b.metrics.app);
+                
                 return cmp * sortDir;
             });
 
-            document.getElementById('summary-badge').textContent = `${filtered.length} Dateien`;
-            resultsList.innerHTML = filtered.length ? '' : `<div class="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-200">Keine Ergebnisse für diese Filtereinstellungen.</div>`;
+            // Update UI count
+            document.getElementById('summary-badge').textContent = `${filtered.length} ${t.fileCount}`;
+            
+            // Build List
+            const resultsList = document.getElementById('results-list');
+            resultsList.innerHTML = filtered.length ? '' : `<div class="p-10 text-center text-gray-500 bg-white rounded-2xl border border-gray-200 shadow-sm">${t.noRes}</div>`;
             
             filtered.forEach(data => {
                 const div = document.createElement('div');
-                div.className = "bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden";
+                div.className = "bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden transition-all";
                 
                 const c = data.narrative.color;
                 const hBg = c==='red'?'bg-red-50':c==='yellow'?'bg-yellow-50':c==='blue'?'bg-blue-50':'bg-gray-50';
                 const iCol = c==='red'?'text-red-500':c==='yellow'?'text-yellow-500':c==='blue'?'text-blue-500':'text-gray-500';
                 const bCol = c==='red'?'border-l-red-500':c==='yellow'?'border-l-yellow-500':c==='blue'?'border-l-blue-500':'border-l-gray-400';
-                const sBg = data.security.color==='green'?'bg-green-100 text-green-800':data.security.color==='yellow'?'bg-yellow-100 text-yellow-800':'bg-gray-100 text-gray-800';
                 
-                let appBadge = data.appInfo.isFirstParty ? `<span class="ml-2 px-2 py-0.5 rounded text-[10px] bg-gray-200 text-gray-700">⚙️ SYSTEM</span>` : 
-                    (data.appInfo.appStoreId ? `<a href="https://apps.apple.com/app/id${data.appInfo.appStoreId}" target="_blank" onclick="event.stopPropagation();" class="ml-2 px-2 py-0.5 rounded text-[10px] bg-blue-100 text-blue-700 hover:bg-blue-200">APP STORE ↗</a>` : '');
+                const secColor = data.security.color;
+                const sBg = secColor==='green'?'bg-green-100 text-green-800 border-green-200' : 
+                            secColor==='yellow'?'bg-yellow-100 text-yellow-800 border-yellow-200' : 
+                            'bg-gray-100 text-gray-800 border-gray-200';
+                
+                let appBadge = data.appInfo.isFirstParty 
+                    ? `<span class="ml-3 px-2.5 py-0.5 rounded-md text-[10px] font-bold tracking-wide bg-gray-200 text-gray-600">⚙️ SYSTEM</span>` 
+                    : (data.appInfo.appStoreId ? `<a href="https://apps.apple.com/app/id${data.appInfo.appStoreId}" target="_blank" onclick="event.stopPropagation();" class="ml-3 px-2.5 py-0.5 rounded-md text-[10px] font-bold tracking-wide bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors border border-blue-200">APP STORE ↗</a>` : '');
 
                 div.innerHTML = `
-                    <button class="w-full text-left p-4 flex items-center justify-between border-l-4 ${bCol} hover:bg-gray-50" onclick="this.nextElementSibling.classList.toggle('expanded'); this.querySelector('.chev').classList.toggle('rotate-180')">
+                    <button class="w-full text-left p-4 sm:p-5 flex items-center justify-between border-l-4 ${bCol} hover:bg-gray-50 transition-colors group" onclick="this.nextElementSibling.classList.toggle('expanded'); this.querySelector('.chev').classList.toggle('rotate-180')">
                         <div class="flex items-center gap-4 truncate">
-                            <div class="${hBg} p-2 rounded-full hidden sm:block"><svg class="w-6 h-6 ${iCol}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+                            <div class="${hBg} p-3 rounded-full hidden sm:flex shrink-0">
+                                <svg class="w-6 h-6 ${iCol}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            </div>
                             <div class="truncate">
-                                <div class="flex items-center"><h3 class="font-bold text-gray-900">${data.metrics.app}</h3>${appBadge}</div>
-                                <div class="text-sm ${iCol} mt-1">${data.narrative.title} <span class="text-gray-400">• ${data.timestampStr.split(' ')[0]}</span></div>
+                                <div class="flex items-center">
+                                    <h3 class="font-bold text-gray-900 text-base sm:text-lg">${data.metrics.app}</h3>
+                                    ${appBadge}
+                                </div>
+                                <div class="text-sm ${iCol} font-medium mt-1 truncate">${data.narrative.title} <span class="text-gray-400 font-normal ml-1">• ${data.timestampStr.split(' ')[0]}</span></div>
                             </div>
                         </div>
-                        <div class="p-2 bg-gray-100 rounded-full chev transition-transform"><svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></div>
+                        <div class="p-2 bg-gray-100 group-hover:bg-gray-200 rounded-full chev transition-all shrink-0 ml-4">
+                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
                     </button>
+                    
                     <div class="accordion-content border-t border-gray-100 bg-gray-50">
-                        <div class="p-4 sm:p-6 flex flex-col gap-4">
-                            <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm"><p class="font-semibold text-gray-800">${data.narrative.desc}</p><p class="text-gray-600 text-sm mt-2">${data.narrative.detailed}</p></div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div class="bg-white p-4 rounded-xl border border-gray-200"><h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Sicherheitsbewertung</h4><span class="px-2 py-1 rounded text-xs font-bold ${sBg}">${data.security.level}</span><p class="text-gray-600 text-sm mt-2">${data.security.desc}</p></div>
-                                <div class="bg-white p-4 rounded-xl border border-gray-200"><h4 class="text-xs font-bold text-gray-500 uppercase mb-2">Empfehlungen</h4><ul class="text-sm text-gray-600 list-disc list-inside">${data.recommendations.map(r=>`<li>${r}</li>`).join('')}</ul></div>
+                        <div class="p-5 sm:p-6 flex flex-col gap-5">
+                            
+                            <!-- Narrative -->
+                            <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                                <p class="font-semibold text-gray-800 text-base">${data.narrative.desc}</p>
+                                <p class="text-gray-600 text-sm mt-3 leading-relaxed">${data.narrative.detailed}</p>
                             </div>
-                            <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="text-xs text-blue-600 underline text-right">Rohdaten einblenden</button>
-                            <pre class="hidden bg-gray-900 text-green-400 p-4 rounded-xl text-xs overflow-auto max-h-64">${JSON.stringify(data.rawPayload, null, 2)}</pre>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <!-- Security -->
+                                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col items-start">
+                                    <h4 class="text-xs font-bold text-gray-400 uppercase mb-3 tracking-wider">${t.secH}</h4>
+                                    <span class="px-3 py-1 rounded-md text-sm font-bold border ${sBg}">${data.security.level}</span>
+                                    <p class="text-gray-600 text-sm mt-3 leading-relaxed">${data.security.desc}</p>
+                                </div>
+                                
+                                <!-- Recommendations -->
+                                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                                    <h4 class="text-xs font-bold text-gray-400 uppercase mb-3 tracking-wider">${t.recH}</h4>
+                                    <ul class="text-sm text-gray-600 list-none space-y-2">
+                                        ${data.recommendations.map(r=>`<li class="flex items-start gap-2"><svg class="w-4 h-4 text-blue-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>${r}</span></li>`).join('')}
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <!-- Technical Raw Data -->
+                            <div class="mt-2 text-right">
+                                <button onclick="const pre = this.nextElementSibling; pre.classList.toggle('hidden');" class="text-xs font-medium text-gray-500 hover:text-blue-600 hover:underline transition-colors">${t.rawH}</button>
+                                <pre class="hidden text-left mt-3 bg-gray-900 text-green-400 p-5 rounded-xl text-xs overflow-auto max-h-80 shadow-inner leading-relaxed whitespace-pre-wrap">${JSON.stringify(data.rawPayload, null, 2)}</pre>
+                            </div>
                         </div>
                     </div>
                 `;
