@@ -37,7 +37,7 @@
 
     <!-- Ad Slot: Top Banner -->
     <div class="w-full max-w-5xl mx-auto mt-4 min-h-[90px] bg-gray-200 flex items-center justify-center rounded-xl overflow-hidden text-gray-400 text-sm relative">
-        <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-3414602833442124" data-ad-slot="1111111111" data-ad-format="auto" data-full-width-responsive="true"></ins>
+        <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-3414602833442124" data-ad-slot="7784754076" data-ad-format="auto" data-full-width-responsive="true"></ins>
         <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
         <span class="absolute -z-10" id="ui-ad-placeholder">Werbung / Advertisement</span>
     </div>
