@@ -152,7 +152,7 @@
                 
                 <!-- Ad Slot: Bottom Inline -->
                 <div class="w-full bg-white p-4 rounded-xl border border-gray-200 text-center text-xs text-gray-400 mb-12 flex justify-center items-center min-h-[90px]">
-                    <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-3414602833442124" data-ad-slot="2222222222" data-ad-format="horizontal" data-full-width-responsive="true"></ins>
+                    <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-3414602833442124" data-ad-slot="2149284015" data-ad-format="horizontal" data-full-width-responsive="true"></ins>
                     <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
                 </div>
             </div>
