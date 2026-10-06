@@ -15,7 +15,18 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <!-- GOOGLE ADSENSE -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3414602833442124" crossorigin="anonymous"></script>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3414602833442124"
+     crossorigin="anonymous"></script>
+<!-- data-ad-slot -->
+<ins class="adsbygoogle"
+     style="display:block"
+     data-ad-client="ca-pub-3414602833442124"
+     data-ad-slot="7784754076"
+     data-ad-format="auto"
+     data-full-width-responsive="true"></ins>
+<script>
+     (adsbygoogle = window.adsbygoogle || []).push({});
+</script>
 
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; color: #111827; }
