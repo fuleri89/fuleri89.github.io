@@ -1,3 +1,5 @@
+[![Netlify Status](https://api.netlify.com/api/v1/badges/0e91d4b6-0b70-4eb5-a431-00d5de9d6936/deploy-status)](https://app.netlify.com/projects/ipsanalyzer/deploys)
+
 <!DOCTYPE html>
 <html lang="de">
 <head>
