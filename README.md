@@ -38,6 +38,8 @@
         .accordion-content.expanded { max-height: 3000px; opacity: 1; overflow: visible; }
     </style>
 </head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3414602833442124"
+     crossorigin="anonymous"></script>
 <body class="min-h-screen flex flex-col relative">
 
     <!-- Cookie Consent (Wichtig für AdSense) -->
